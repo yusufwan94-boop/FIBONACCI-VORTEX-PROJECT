@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coandă Helical Microstructure Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            blue: '#06b6d4',
+                            amber: '#f59e0b',
+                            red: '#ef4444'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        .light ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        /* Custom styles for canvas control container */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .light .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 transition-colors duration-300 font-sans min-h-screen flex flex-col overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 dark:bg-slate-950 dark:text-slate-100 light:bg-slate-50 light:text-slate-900">
+
+    <!-- Header / Navigation -->
+    <header class="border-b border-slate-800 dark:border-slate-800 light:border-slate-200 bg-slate-900/40 dark:bg-slate-950/40 light:bg-white/60 backdrop-blur-md px-4 sm:px-6 py-4 flex justify-between items-center z-10">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-cyan-500 to-amber-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <svg class="w-5 h-5 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm sm:text-base tracking-tight bg-gradient-to-r from-cyan-400 via-amber-400 to-red-400 bg-clip-text text-transparent uppercase">
+                    Aero-Owl Coandă Labs
+                </h1>
+                <p class="text-[10px] sm:text-xs text-slate-400 dark:text-slate-400 light:text-slate-500 font-mono">FLOW FIELD RESOLUTION DETECTOR</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-4">
+            <!-- Light/Dark Mode Switcher -->
+            <button id="theme-toggle" class="p-2 rounded-lg bg-slate-800/60 dark:bg-slate-900/60 light:bg-slate-200/80 border border-slate-700/50 dark:border-slate-800 light:border-slate-300 hover:text-cyan-400 dark:hover:text-cyan-400 light:hover:text-cyan-600 transition duration-200">
+                <!-- Moon icon (Dark mode state) -->
+                <svg id="theme-icon-dark" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+                <!-- Sun icon (Light mode state) -->
+                <svg id="theme-icon-light" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                </svg>
+            </button>
+            <span class="hidden sm:inline-block px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-400 dark:bg-slate-900 dark:border-slate-800 dark:text-cyan-400 light:bg-slate-200 light:border-slate-300 light:text-cyan-600">3D-Engine v4.1</span>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex flex-col lg:flex-row relative">
+        
+        <!-- Left Side: Interactive 3D Canvas -->
+        <div class="flex-1 min-h-[400px] lg:h-[calc(100vh-73px)] relative bg-slate-950 dark:bg-slate-950 light:bg-slate-100 flex flex-col">
+            
+            <!-- Tab Controls to Switch Views -->
+            <div class="absolute top-4 left-4 right-4 sm:right-auto flex gap-1 bg-slate-900/90 dark:bg-slate-950/90 light:bg-white/90 border border-slate-800 dark:border-slate-800 light:border-slate-200 p-1 rounded-xl shadow-2xl z-20 max-w-sm">
+                <button id="tab-nozzle" class="flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-bold transition duration-200 flex items-center justify-center gap-2 bg-cyan-500 text-slate-950">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    1. Micro-Nozzle Detail
+                </button>
+                <button id="tab-combustor" class="flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-bold transition duration-200 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-200 dark:text-slate-400 dark:hover:text-slate-200 light:text-slate-500 light:hover:text-slate-800">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    2. Combustor Core View
+                </button>
+            </div>
+
+            <!-- ThreeJS Target Element -->
+            <div id="canvas-wrapper" class="flex-1 w-full h-full cursor-grab active:cursor-grabbing relative overflow-hidden">
+                <!-- Fallback Loading Indicator -->
+                <div id="loading-overlay" class="absolute inset-0 bg-slate-950 dark:bg-slate-950 light:bg-slate-50 flex flex-col items-center justify-center z-30 transition-opacity duration-500">
+                    <div class="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <span class="font-mono text-xs tracking-widest text-cyan-500 uppercase animate-pulse">Initializing Flow Field Simulation...</span>
+                </div>
+            </div>
+
+            <!-- Active Phase Floating Insight Card -->
+            <div id="insight-floating-box" class="absolute bottom-4 left-4 right-4 sm:right-auto max-w-sm glass-panel rounded-2xl p-4 shadow-2xl z-10 flex gap-3 text-xs leading-normal">
+                <div class="w-2 h-auto rounded bg-gradient-to-b from-cyan-500 to-amber-500 shrink-0"></div>
+                <div class="space-y-1">
+                    <div class="font-bold text-slate-200 dark:text-slate-200 light:text-slate-800 uppercase tracking-wide font-mono text-[10px]">Real-time Flow Physics</div>
+                    <p id="insight-text" class="text-slate-300 dark:text-slate-300 light:text-slate-600 font-sans">
+                        High-velocity compressor air injects into the micro-shingle. The Coandă curvature causes a local drop in static pressure, anchoring the flow down to the surface.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Educational Controls Sidebar -->
+        <aside class="w-full lg:w-[480px] bg-slate-900/60 dark:bg-slate-950 light:bg-white border-t lg:border-t-0 lg:border-l border-slate-800 dark:border-slate-800 light:border-slate-200 flex flex-col z-20">
+            
+            <!-- Working Principle Tabs -->
+            <div class="border-b border-slate-800 dark:border-slate-800 light:border-slate-200 px-6 py-4">
+                <h2 class="text-base font-bold tracking-tight text-white dark:text-white light:text-slate-900 uppercase">
+                    Boundary-Layer Engineering
+                </h2>
+                <p class="text-xs text-slate-400 dark:text-slate-400 light:text-slate-500">How geometry bypasses mechanical control systems</p>
+            </div>
+
+            <!-- Scrollable Mechanics & Control Panels -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                
+                <!-- Dynamic Principle Section -->
+                <div id="nozzle-principle-card" class="space-y-4">
+                    <div class="bg-gradient-to-br from-cyan-950/20 to-slate-900/20 border border-cyan-800/30 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+                        <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl"></div>
+                        <h3 class="text-sm font-bold text-cyan-400 dark:text-cyan-400 light:text-cyan-600 font-mono tracking-wider uppercase mb-2 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded bg-cyan-500"></span>
+                            The Dispenser Micro-Mechanic
+                        </h3>
+                        <p class="text-xs text-slate-300 dark:text-slate-300 light:text-slate-600 leading-relaxed mb-3">
+                            Each individual dispenser is a micro-machined slot sculpted with a gentle, curved exit slope. When compressed air is shot through this throat, it doesn't jet straight outwards. Instead, it is forced to hug the curve (the Coandă effect), flattening out and forming a tiny rotating micro-vortex.
+                        </p>
+                        <div class="bg-slate-950/60 dark:bg-slate-900/40 light:bg-slate-100 rounded-xl p-3 border border-slate-800/80 dark:border-slate-800/60 light:border-slate-200 space-y-2 text-[11px] font-mono">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Pressure Gradient:</span>
+                                <span class="text-cyan-400 font-bold">ΔP = -14.2 kPa</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Shear Dispersion Rate:</span>
+                                <span class="text-cyan-400 font-bold">12,400 rev/sec</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="combustor-principle-card" class="space-y-4 hidden">
+                    <div class="bg-gradient-to-br from-amber-950/20 to-slate-900/20 border border-amber-800/30 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+                        <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl"></div>
+                        <h3 class="text-sm font-bold text-amber-500 dark:text-amber-500 light:text-amber-600 font-mono tracking-wider uppercase mb-2 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded bg-amber-500 animate-pulse"></span>
+                            Global Core Consequence
+                        </h3>
+                        <p class="text-xs text-slate-300 dark:text-slate-300 light:text-slate-600 leading-relaxed mb-3">
+                            When thousands of these local micro-spins cascade in unison down the inner cylinder wall, they combine structurally. The individual tangential streams merge, driving a massive clockwise central tornado (Macro-Vortex) without any physical, stationary engine stator vanes.
+                        </p>
+                        <div class="bg-slate-950/60 dark:bg-slate-900/40 light:bg-slate-100 rounded-xl p-3 border border-slate-800/80 dark:border-slate-800/60 light:border-slate-200 space-y-2 text-[11px] font-mono">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Macro Swirl Power:</span>
+                                <span class="text-amber-500 font-bold">8,500 Nm Kinetic</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Thermal Barrier Delta:</span>
+                                <span class="text-amber-500 font-bold">ΔT = 1,200°C Shield</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Interactive Sliders -->
+                <div class="space-y-4">
+                    <h4 class="text-[11px] font-mono tracking-widest text-slate-400 dark:text-slate-400 light:text-slate-500 uppercase border-b border-slate-800 dark:border-slate-800 light:border-slate-200 pb-1.5 font-bold">Engine Variable Control</h4>
+                    
+                    <!-- Slider 1: Air Velocity -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-mono">
+                            <span class="text-slate-400">Compressor Air Pressure</span>
+                            <span id="val-air-vel" class="text-cyan-400 font-bold">4.2 bar</span>
+                        </div>
+                        <input type="range" id="slide-air-vel" min="10" max="100" value="42" class="w-full accent-cyan-500 h-1 bg-slate-800 dark:bg-slate-800 light:bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Slider 2: Fuel Timing Dispersion -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-mono">
+                            <span class="text-slate-400">Asynchronous Fuel Pulse Rate</span>
+                            <span id="val-fuel-rate" class="text-amber-500 font-bold">2.4 kHz</span>
+                        </div>
+                        <input type="range" id="slide-fuel-rate" min="10" max="100" value="24" class="w-full accent-amber-500 h-1 bg-slate-800 dark:bg-slate-800 light:bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Slider 3: Rotational Offset / Alignment -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs font-mono">
+                            <span class="text-slate-400">Helical Nozzle Pitch Angle</span>
+                            <span id="val-pitch-angle" class="text-red-400 font-bold">34°</span>
+                        </div>
+                        <input type="range" id="slide-pitch-angle" min="15" max="65" value="34" class="w-full accent-red-500 h-1 bg-slate-800 dark:bg-slate-800 light:bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Live Diagnostic Graph Interface -->
+                <div class="space-y-3 bg-slate-950/60 dark:bg-slate-900/40 light:bg-slate-100 border border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-2xl p-4">
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-[11px] font-mono tracking-wider text-slate-400 dark:text-slate-400 light:text-slate-500 uppercase font-bold">Fluidic Shear Force Ratio</h4>
+                        <span class="px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-[9px] text-cyan-400 font-mono">LIVE VECTOR</span>
+                    </div>
+                    <!-- Virtual Oscilloscope Graph -->
+                    <div class="h-20 flex items-end gap-[3px] px-1 bg-slate-950 border border-slate-900/60 dark:border-slate-900/60 light:border-slate-200 rounded-xl overflow-hidden relative">
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
+                            <!-- Matrix lines -->
+                            <div class="w-full h-full bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:10px_10px]"></div>
+                        </div>
+                        <div class="flex-1 flex items-end justify-between h-full pt-4" id="vis-bars-container">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-500 mt-2">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded bg-cyan-500"></span>
+                            <span>Wall Boundary Jet</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded bg-amber-500"></span>
+                            <span>Evaporative Layer</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Quick Info Footnote -->
+            <div class="bg-slate-950 dark:bg-slate-950 light:bg-slate-100 p-4 border-t border-slate-800 dark:border-slate-800 light:border-slate-200 flex justify-between items-center text-[10px] font-mono text-slate-500">
+                <span>© AERO-OWL THERMAL DYNAMICS</span>
+                <button id="btn-re-zero" class="hover:text-cyan-400 text-slate-400 transition flex items-center gap-1 uppercase">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18" />
+                    </svg>
+                    Re-Zero Core
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Main Simulator Script Logic -->
+    <script>
+        // --- App Configuration & Initial States ---
+        const config = {
+            view: 'nozzle', // 'nozzle' or 'combustor'
+            theme: 'dark', // 'dark' or 'light'
+            airPressure: 42, // bar index scaling
+            fuelRate: 24, // kHz index
+            pitchAngle: 34, // degree angle
+            rotSpeed: 0.005,
+            particlesCount: 150
+        };
+
+        // DOM elements
+        const htmlNode = document.documentElement;
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIconDark = document.getElementById('theme-icon-dark');
+        const themeIconLight = document.getElementById('theme-icon-light');
+        const tabNozzle = document.getElementById('tab-nozzle');
+        const tabCombustor = document.getElementById('tab-combustor');
+        const wrapper = document.getElementById('canvas-wrapper');
+        const loading = document.getElementById('loading-overlay');
+        const insightText = document.getElementById('insight-text');
+        const nozzleCard = document.getElementById('nozzle-principle-card');
+        const combustorCard = document.getElementById('combustor-principle-card');
+        const btnReZero = document.getElementById('btn-re-zero');
+
+        // Sliders
+        const slideAirVel = document.getElementById('slide-air-vel');
+        const valAirVel = document.getElementById('val-air-vel');
+        const slideFuelRate = document.getElementById('slide-fuel-rate');
+        const valFuelRate = document.getElementById('val-fuel-rate');
+        const slidePitchAngle = document.getElementById('slide-pitch-angle');
+        const valPitchAngle = document.getElementById('val-pitch-angle');
+
+        // Spectrum Analyzer setup
+        const visContainer = document.getElementById('vis-bars-container');
+        const visCount = 28;
+        const visBars = [];
+        for (let i = 0; i < visCount; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'w-[8px] rounded-t transition-all duration-75 origin-bottom bg-cyan-500';
+            visContainer.appendChild(bar);
+            visBars.push(bar);
+        }
+
+        // --- Three.js Setup Variables ---
+        let scene, camera, renderer;
+        let ambientLight, dirLight, pointLight;
+        let flowParticles = [];
+        let fuelParticles = [];
+        
+        // Nozzle View Specific Geometries
+        let shingleNozzleMesh;
+        let coreAirInflowArrow, wallHuggingArrow;
+
+        // Combustor View Specific Geometries
+        let combustorCoreMesh, spiralWallGlow;
+
+        // --- Initialize 3D Engine ---
+        function init3DEngine() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            setThemeColors();
+
+            // Camera Setup
+            camera = new THREE.PerspectiveCamera(45, wrapper.clientWidth / wrapper.clientHeight, 0.1, 100);
+            resetCamera();
+
+            // WebGL Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(wrapper.clientWidth, wrapper.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            wrapper.appendChild(renderer.domElement);
+
+            // Lighting Configuration
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+            scene.add(ambientLight);
+
+            dirLight = new THREE.DirectionalLight(0x06b6d4, 1.2);
+            dirLight.position.set(6, 12, 8);
+            scene.add(dirLight);
+
+            pointLight = new THREE.PointLight(0xf59e0b, 1.5, 15);
+            pointLight.position.set(0, 0, 0);
+            scene.add(pointLight);
+
+            // Build dynamic models
+            buildNozzleModel();
+            buildCombustorModel();
+
+            // Initialize Controls & Interactivity
+            setupInteractivity();
+
+            // Hide loading indicator on completion
+            setTimeout(() => {
+                loading.classList.add('opacity-0');
+                setTimeout(() => loading.classList.add('hidden'), 500);
+            }, 800);
+
+            // Start Main Simulation Frame Loop
+            animate();
+        }
+
+        // --- Set Light/Dark Themes inside Three.js Scene ---
+        function setThemeColors() {
+            if (config.theme === 'dark') {
+                scene.background = new THREE.Color(0x020617);
+                scene.fog = new THREE.FogExp2(0x020617, 0.02);
+            } else {
+                scene.background = new THREE.Color(0xf1f5f9);
+                scene.fog = new THREE.FogExp2(0xf1f5f9, 0.02);
+            }
+        }
+
+        function resetCamera() {
+            if (config.view === 'nozzle') {
+                camera.position.set(0, 8, 12);
+            } else {
+                camera.position.set(0, 7, 15);
+            }
+            camera.lookAt(0, 0, 0);
+        }
+
+        // --- Model Builder: 3D Single Helical Microstructure Nozzle ---
+        function buildNozzleModel() {
+            shingleNozzleMesh = new THREE.Group();
+
+            // 1. Core Metal Plate (The wall section)
+            const wallGeom = new THREE.BoxGeometry(7, 0.8, 6);
+            const wallMat = new THREE.MeshPhysicalMaterial({
+                color: config.theme === 'dark' ? 0x1e293b : 0xcbd5e1,
+                roughness: 0.4,
+                metalness: 0.85,
+                clearcoat: 0.2
+            });
+            const wallMesh = new THREE.Mesh(wallGeom, wallMat);
+            wallMesh.position.y = -0.4;
+            shingleNozzleMesh.add(wallMesh);
+
+            // 2. The Curved Shingle Ramp (The Coandă Surface)
+            // Creating a custom curved surface shape via Extrude
+            const curveShape = new THREE.Shape();
+            curveShape.moveTo(-1.5, 0);
+            curveShape.quadraticCurveTo(0.5, 0.1, 1.5, 1.0); // The critical Coandă curvature
+            curveShape.lineTo(2.0, 1.0);
+            curveShape.lineTo(2.0, -0.4);
+            curveShape.lineTo(-1.5, -0.4);
+            curveShape.lineTo(-1.5, 0);
+
+            const extrudeSettings = { depth: 4.8, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.05, bevelThickness: 0.05 };
+            const rampGeom = new THREE.ExtrudeGeometry(curveShape, extrudeSettings);
+            const rampMat = new THREE.MeshPhysicalMaterial({
+                color: config.theme === 'dark' ? 0x0f172a : 0x94a3b8,
+                roughness: 0.2,
+                metalness: 0.9,
+                clearcoat: 0.6
+            });
+            const rampMesh = new THREE.Mesh(rampGeom, rampMat);
+            rampMesh.position.set(-0.5, 0, -2.4);
+            shingleNozzleMesh.add(rampMesh);
+
+            // 3. The Injection Slot Mouth (The Air inlet)
+            const inletGeom = new THREE.BoxGeometry(0.3, 0.5, 4.5);
+            const inletMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, wireframe: true, transparent: true, opacity: 0.4 });
+            const inletMesh = new THREE.Mesh(inletGeom, inletMat);
+            inletMesh.position.set(-2.0, 0.25, 0);
+            shingleNozzleMesh.add(inletMesh);
+
+            // 4. Kerosene Spray Injector Nozzle (Mini tip)
+            const injectorGeom = new THREE.CylinderGeometry(0.1, 0.15, 0.8, 12);
+            const injectorMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.2, metalness: 0.9 });
+            const injector = new THREE.Mesh(injectorGeom, injectorMat);
+            injector.rotation.z = Math.PI / 4;
+            injector.position.set(-1.8, 0.8, 0);
+            shingleNozzleMesh.add(injector);
+
+            scene.add(shingleNozzleMesh);
+        }
+
+        // --- Model Builder: 3D Whole Combustor Chamber ---
+        function buildCombustorModel() {
+            combustorCoreMesh = new THREE.Group();
+
+            // Translucent Outer Boundary Shell
+            const cylinderGeom = new THREE.CylinderGeometry(4.2, 4.2, 11, 48, 1, true);
+            const cylinderMat = new THREE.MeshPhysicalMaterial({
+                color: config.theme === 'dark' ? 0x0f172a : 0xe2e8f0,
+                transparent: true,
+                opacity: config.theme === 'dark' ? 0.15 : 0.4,
+                roughness: 0.3,
+                metalness: 0.8,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const shell = new THREE.Mesh(cylinderGeom, cylinderMat);
+            shell.rotation.x = Math.PI / 2;
+            combustorCoreMesh.add(shell);
+
+            // Structured wireframe ribs to emphasize structural balance
+            const skeletonGeom = new THREE.CylinderGeometry(4.22, 4.22, 11, 16, 8, true);
+            const skeletonMat = new THREE.MeshBasicMaterial({
+                color: config.theme === 'dark' ? 0x1e293b : 0x94a3b8,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.3
+            });
+            const skeleton = new THREE.Mesh(skeletonGeom, skeletonMat);
+            skeleton.rotation.x = Math.PI / 2;
+            combustorCoreMesh.add(skeleton);
+
+            scene.add(combustorCoreMesh);
+            combustorCoreMesh.visible = false; // Hidden on initial start
+        }
+
+        // --- Particle Spawning & Update Physics ---
+        function handleSimParticles() {
+            const tempSpeed = config.airPressure / 100;
+            const sprayPulseFactor = config.fuelRate / 100;
+
+            if (config.view === 'nozzle') {
+                // 1. AIR FLOW PARTICLES: Squeezing out of nozzle and hugging the shingle curve
+                if (flowParticles.length < config.particlesCount && Math.random() < 0.6) {
+                    const pGeom = new THREE.SphereGeometry(0.06, 6, 6);
+                    const pMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.9 });
+                    const pMesh = new THREE.Mesh(pGeom, pMat);
+                    // Spawn at nozzle mouth
+                    pMesh.position.set(-2.0, 0.25, (Math.random() * 4.0) - 2.0);
+                    scene.add(pMesh);
+
+                    flowParticles.push({
+                        mesh: pMesh,
+                        xVel: 0.05 + tempSpeed * 0.05,
+                        yVel: 0.0,
+                        state: 'entry',
+                        age: 0,
+                        maxAge: 120 + Math.random() * 50
+                    });
+                }
+
+                // Update air particle kinematics
+                for (let i = flowParticles.length - 1; i >= 0; i--) {
+                    const p = flowParticles[i];
+                    p.age += 1;
+
+                    if (p.age >= p.maxAge) {
+                        scene.remove(p.mesh);
+                        flowParticles.splice(i, 1);
+                        continue;
+                    }
+
+                    // Curve Physics Simulation (Simulating the physical Coandă effect)
+                    if (p.mesh.position.x > -1.5 && p.mesh.position.x < 1.0) {
+                        // Hug curve: move up slightly as we translate right
+                        const targetY = 0.25 + Math.pow((p.mesh.position.x + 1.5) / 2.5, 2.0) * 0.65;
+                        p.mesh.position.y += (targetY - p.mesh.position.y) * 0.25;
+                        p.mesh.material.color.setHex(0x06b6d4); // Vivid cyan wall-flow
+                    } else if (p.mesh.position.x >= 1.0) {
+                        // At shingle lip: start spinning/rolling back, forming the micro-vortex
+                        p.mesh.position.x += 0.02 * tempSpeed;
+                        // Tangential roll down-stream
+                        p.mesh.position.y += Math.sin(p.age * 0.1) * 0.03;
+                        p.mesh.position.z += Math.cos(p.age * 0.1) * 0.03;
+                        p.mesh.material.color.setHex(0xf59e0b); // Warming up
+                    } else {
+                        // Accelerating inside slot
+                        p.mesh.position.x += p.xVel;
+                    }
+
+                    // Move down plane
+                    p.mesh.position.x += p.xVel;
+                }
+
+                // 2. FUEL ATOMIZATION PARTICLES: Injected out of spray nozzle
+                if (fuelParticles.length < 100 && Math.random() < 0.3 * sprayPulseFactor) {
+                    const fGeom = new THREE.SphereGeometry(0.04, 6, 6);
+                    const fMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+                    const fMesh = new THREE.Mesh(fGeom, fMat);
+                    fMesh.position.set(-1.8, 0.8, (Math.random() * 2) - 1);
+                    scene.add(fMesh);
+
+                    fuelParticles.push({
+                        mesh: fMesh,
+                        xVel: 0.04,
+                        yVel: -0.04,
+                        scale: 1.0,
+                        age: 0,
+                        maxAge: 80
+                    });
+                }
+
+                // Update Fuel droplet mechanics
+                for (let i = fuelParticles.length - 1; i >= 0; i--) {
+                    const f = fuelParticles[i];
+                    f.age += 1;
+
+                    // Droplet moves downwards and encounters the high-velocity air boundary
+                    f.mesh.position.x += f.xVel;
+                    f.mesh.position.y += f.yVel;
+
+                    // Centrifugal shearing: When hit by the Coandă boundary, drop shrinks and evaporates
+                    if (f.mesh.position.y < 0.6) {
+                        f.scale -= 0.02; // Droplet vaporizes
+                        f.mesh.scale.set(f.scale, f.scale, f.scale);
+                        f.mesh.material.color.setHex(0xef4444); // Flash ignition color change
+                        f.yVel = -0.01; // carried away by boundary stream
+                        f.xVel = 0.08 * tempSpeed; 
+                    }
+
+                    if (f.age >= f.maxAge || f.scale <= 0.05) {
+                        scene.remove(f.mesh);
+                        fuelParticles.splice(i, 1);
+                    }
+                }
+
+            } else {
+                // COMBUSTOR VIEW FLUID FIELD: Wall film + Screaming central core
+                // Clear any lingering 1-nozzle particles
+                if (flowParticles.length > 0 && flowParticles[0].mesh.position.x < 3.0) {
+                    flowParticles.forEach(p => scene.remove(p.mesh));
+                    flowParticles = [];
+                    fuelParticles.forEach(f => scene.remove(f.mesh));
+                    fuelParticles = [];
+                }
+
+                // Spawn dual-swirl matrix particles
+                if (flowParticles.length < config.particlesCount) {
+                    const pGeom = new THREE.SphereGeometry(0.05, 5, 5);
+                    const pMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.85 });
+                    const pMesh = new THREE.Mesh(pGeom, pMat);
+                    scene.add(pMesh);
+
+                    const theta = Math.random() * Math.PI * 2;
+                    flowParticles.push({
+                        mesh: pMesh,
+                        theta: theta,
+                        radius: 4.1, // starts close to inner wall boundary
+                        z: (Math.random() * 10) - 5,
+                        type: Math.random() < 0.35 ? 'core' : 'wall', // core tornado vs protective wall film
+                        age: 0,
+                        maxAge: 150 + Math.random() * 80
+                    });
+                }
+
+                // Update whole combustor fluids
+                const pitchRad = (config.pitchAngle * Math.PI) / 180;
+                flowParticles.forEach((p, index) => {
+                    p.age += 1;
+
+                    if (p.type === 'wall') {
+                        // Wall-hugging protective film (Helical micro-spins)
+                        p.theta += 0.04 * tempSpeed;
+                        p.z += Math.sin(pitchRad) * 0.05; // moves down chamber
+                        p.radius = 4.1 + Math.sin(p.age * 0.2) * 0.08; // tightly bound fluctuation
+
+                        p.mesh.position.x = p.radius * Math.cos(p.theta);
+                        p.mesh.position.y = p.radius * Math.sin(p.theta);
+                        p.mesh.position.z = p.z;
+                        p.mesh.material.color.setHex(0x06b6d4); // Cold protective air
+                    } else {
+                        // Hot screaming Macro-Vortex core (Centrally drawn)
+                        p.theta += 0.09 * tempSpeed; // Spins significantly faster towards center
+                        p.z += 0.1 * tempSpeed;
+                        
+                        // Centripetal decay: drawn into core tornado
+                        if (p.radius > 0.4) {
+                            p.radius -= 0.02 * tempSpeed;
+                        }
+
+                        p.mesh.position.x = p.radius * Math.cos(p.theta);
+                        p.mesh.position.y = p.radius * Math.sin(p.theta);
+                        p.mesh.position.z = p.z;
+
+                        // Hot combustion colors
+                        if (p.radius < 1.0) {
+                            p.mesh.material.color.setHex(0xef4444); // Raging red-hot core
+                        } else {
+                            p.mesh.material.color.setHex(0xf59e0b); // Flame zone boundary
+                        }
+                    }
+
+                    // Recycle boundaries
+                    if (p.z > 5.5 || p.age >= p.maxAge) {
+                        p.z = -5.5;
+                        p.radius = p.type === 'wall' ? 4.1 : 3.8;
+                        p.age = 0;
+                    }
+                });
+            }
+        }
+
+        // --- Interaction Drag Controllers ---
+        let isDragging = false;
+        let prevX = 0, prevY = 0;
+        let isAutoRotating = true;
+
+        function setupInteractivity() {
+            const trg = renderer.domElement;
+
+            trg.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                prevX = e.clientX;
+                prevY = e.clientY;
+                isAutoRotating = false;
+            });
+
+            window.addEventListener('mouseup', () => isDragging = false);
+
+            trg.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dX = e.clientX - prevX;
+                const dY = e.clientY - prevY;
+
+                const activeGroup = config.view === 'nozzle' ? shingleNozzleMesh : combustorCoreMesh;
+                activeGroup.rotation.y += dX * 0.007;
+                activeGroup.rotation.x += dY * 0.007;
+
+                prevX = e.clientX;
+                prevY = e.clientY;
+            });
+
+            // Touch support for Mobile / iPad
+            trg.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    isDragging = true;
+                    prevX = e.touches[0].clientX;
+                    prevY = e.touches[0].clientY;
+                    isAutoRotating = false;
+                }
+            });
+
+            trg.addEventListener('touchend', () => isDragging = false);
+
+            trg.addEventListener('touchmove', (e) => {
+                if (!isDragging || e.touches.length !== 1) return;
+                const dX = e.touches[0].clientX - prevX;
+                const dY = e.touches[0].clientY - prevY;
+
+                const activeGroup = config.view === 'nozzle' ? shingleNozzleMesh : combustorCoreMesh;
+                activeGroup.rotation.y += dX * 0.007;
+                activeGroup.rotation.x += dY * 0.007;
+
+                prevX = e.touches[0].clientX;
+                prevY = e.touches[0].clientY;
+            }, { passive: true });
+        }
+
+        // --- Main Visualizer Frame Loop ---
+        let graphOffset = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate models
+            if (isAutoRotating) {
+                if (config.view === 'nozzle') {
+                    shingleNozzleMesh.rotation.y = Math.sin(Date.now() * 0.0003) * 0.4;
+                    shingleNozzleMesh.rotation.x = 0.5; // lock pitch
+                } else {
+                    combustorCoreMesh.rotation.y += config.rotSpeed;
+                    combustorCoreMesh.rotation.x = 0.4;
+                }
+            }
+
+            // Update particle dynamics
+            handleSimParticles();
+
+            // Run active wave visualizer
+            graphOffset += 0.08;
+            visBars.forEach((bar, index) => {
+                const pressureMultiplier = config.airPressure / 40;
+                // Complex wave calculation simulating fluid boundaries
+                const height = Math.abs(Math.sin(index * 0.4 + graphOffset) * Math.cos(index * 0.1 - graphOffset * 0.5)) * 90 * pressureMultiplier;
+                bar.style.height = `${Math.max(6, Math.min(100, height))}%`;
+                
+                // Color spectrum shifts
+                if (index % 3 === 0) {
+                    bar.className = 'w-[8px] rounded-t transition-all duration-75 origin-bottom bg-amber-500';
+                } else {
+                    bar.className = 'w-[8px] rounded-t transition-all duration-75 origin-bottom bg-cyan-500';
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // --- Switch View Mode Engine ---
+        function switchView(target) {
+            config.view = target;
+            resetCamera();
+
+            if (target === 'nozzle') {
+                tabNozzle.className = "flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-bold transition duration-200 flex items-center justify-center gap-2 bg-cyan-500 text-slate-950 shadow-md";
+                tabCombustor.className = "flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-bold transition duration-200 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-200 dark:text-slate-400 dark:hover:text-slate-200 light:text-slate-500 light:hover:text-slate-800";
+
+                shingleNozzleMesh.visible = true;
+                combustorCoreMesh.visible = false;
+                
+                nozzleCard.classList.remove('hidden');
+                combustorCard.classList.add('hidden');
+
+                insightText.textContent = "High-velocity compressor air injects into the micro-shingle. The Coandă curvature causes a local drop in static pressure, anchoring the flow down to the surface.";
+            } else {
+                tabCombustor.className = "flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-bold transition duration-200 flex items-center justify-center gap-2 bg-amber-500 text-slate-950 shadow-md";
+                tabNozzle.className = "flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-bold transition duration-200 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-200 dark:text-slate-400 dark:hover:text-slate-200 light:text-slate-500 light:hover:text-slate-800";
+
+                shingleNozzleMesh.visible = false;
+                combustorCoreMesh.visible = true;
+
+                combustorCard.classList.remove('hidden');
+                nozzleCard.classList.add('hidden');
+
+                insightText.textContent = "The aggregate effect: Individual wall-hugging boundary micro-spins merge. They continuously drive the massive clockwise Core Tornado (the Macro-Vortex).";
+            }
+        }
+
+        // --- Event Binding Handlers ---
+        tabNozzle.addEventListener('click', () => switchView('nozzle'));
+        tabCombustor.addEventListener('click', () => switchView('combustor'));
+
+        // Dark/Light Theme Switcher Logic
+        themeToggle.addEventListener('click', () => {
+            if (config.theme === 'dark') {
+                config.theme = 'light';
+                htmlNode.className = 'light';
+                themeIconDark.classList.remove('hidden');
+                themeIconLight.classList.add('hidden');
+            } else {
+                config.theme = 'dark';
+                htmlNode.className = 'dark';
+                themeIconLight.classList.remove('hidden');
+                themeIconDark.classList.add('hidden');
+            }
+            setThemeColors();
+            // Rebuild wall segments with matching metal reflectivity colors
+            shingleNozzleMesh.children[0].material.color.setHex(config.theme === 'dark' ? 0x1e293b : 0xcbd5e1);
+            shingleNozzleMesh.children[1].material.color.setHex(config.theme === 'dark' ? 0x0f172a : 0x94a3b8);
+            combustorCoreMesh.children[0].material.color.setHex(config.theme === 'dark' ? 0x0f172a : 0xe2e8f0);
+            combustorCoreMesh.children[0].material.opacity = config.theme === 'dark' ? 0.15 : 0.4;
+            combustorCoreMesh.children[1].material.color.setHex(config.theme === 'dark' ? 0x1e293b : 0x94a3b8);
+        });
+
+        // Sliders adjustments update loops
+        slideAirVel.addEventListener('input', (e) => {
+            config.airPressure = parseInt(e.target.value);
+            valAirVel.textContent = `${(config.airPressure / 10).toFixed(1)} bar`;
+        });
+
+        slideFuelRate.addEventListener('input', (e) => {
+            config.fuelRate = parseInt(e.target.value);
+            valFuelRate.textContent = `${(config.fuelRate / 10).toFixed(1)} kHz`;
+        });
+
+        slidePitchAngle.addEventListener('input', (e) => {
+            config.pitchAngle = parseInt(e.target.value);
+            valPitchAngle.textContent = `${config.pitchAngle}°`;
+        });
+
+        btnReZero.addEventListener('click', () => {
+            // Re-zero parameters to nominal core safety configuration
+            config.airPressure = 42;
+            config.fuelRate = 24;
+            config.pitchAngle = 34;
+
+            slideAirVel.value = 42;
+            slideFuelRate.value = 24;
+            slidePitchAngle.value = 34;
+
+            valAirVel.textContent = "4.2 bar";
+            valFuelRate.textContent = "2.4 kHz";
+            valPitchAngle.textContent = "34°";
+
+            switchView('nozzle');
+            isAutoRotating = true;
+            camera.position.set(0, 8, 12);
+            camera.lookAt(0, 0, 0);
+            shingleNozzleMesh.rotation.set(0, 0, 0);
+            combustorCoreMesh.rotation.set(0, 0, 0);
+        });
+
+        // Window resize responsive redrawing
+        window.addEventListener('resize', () => {
+            camera.aspect = wrapper.clientWidth / wrapper.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(wrapper.clientWidth, wrapper.clientHeight);
+        });
+
+        // Trigger simulation bootstrap on page loaded
+        window.onload = function() {
+            init3DEngine();
+        }
+    </script>
+</body>
+</html>
